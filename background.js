@@ -13,7 +13,8 @@
 
 console.log('Background script loaded');
 
-chrome.action.onClicked.addListener((tab) => {
+// Change from chrome.action to browser.action
+browser.action.onClicked.addListener((tab) => {
   console.log('Extension icon clicked');
   sanitizeAndUpdateUrl(tab);
 });
@@ -39,22 +40,25 @@ function sanitizeAndUpdateUrl(tab) {
   console.log('Sanitized URL:', sanitizedUrl);
   
   // Update the current tab with the sanitized URL
-  chrome.tabs.update(tab.id, { url: sanitizedUrl }, () => {
+  // Firefox uses browser namespace and returns promises
+  browser.tabs.update(tab.id, { url: sanitizedUrl }).then(() => {
     console.log('Tab updated with sanitized URL');
-    // Wait for the page to load before injecting the content script
-    chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
-      if (tabId === tab.id && info.status === 'complete') {
-        chrome.tabs.onUpdated.removeListener(listener);
+    
+    // Create a listener for the tab update
+    const handleUpdated = (tabId, changeInfo, tabInfo) => {
+      if (tabId === tab.id && changeInfo.status === 'complete') {
+        // Remove the listener once we've handled the update
+        browser.tabs.onUpdated.removeListener(handleUpdated);
         
         console.log('Page loaded, copying to clipboard');
-        chrome.scripting.executeScript({
+        browser.scripting.executeScript({
           target: { tabId: tab.id },
           func: copyToClipboard,
           args: [sanitizedUrl]
         }).then((results) => {
           console.log('Clipboard operation completed, showing notification');
           const copySucceeded = results[0].result;
-          chrome.scripting.executeScript({
+          browser.scripting.executeScript({
             target: { tabId: tab.id },
             func: showNotification,
             args: [
@@ -64,14 +68,17 @@ function sanitizeAndUpdateUrl(tab) {
           });
         }).catch((error) => {
           console.error('Error during clipboard operation:', error);
-          chrome.scripting.executeScript({
+          browser.scripting.executeScript({
             target: { tabId: tab.id },
             func: showNotification,
             args: ['URL sanitized, but an error occurred while trying to copy.', true]  // isError flag
           });
         });
       }
-    });
+    };
+    
+    // Add the listener
+    browser.tabs.onUpdated.addListener(handleUpdated);
   });
 }
 
