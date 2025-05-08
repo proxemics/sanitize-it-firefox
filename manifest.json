@@ -5,7 +5,6 @@
   "description": "Remove tracking information from the current page and automatically copy the URL to your clipboard.",
   "permissions": [
     "activeTab",
-    "scripting",
     "clipboardWrite",
     "tabs"
   ],

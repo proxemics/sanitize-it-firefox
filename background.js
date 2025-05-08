@@ -13,8 +13,15 @@
 
 console.log('Background script loaded');
 
-// Change from chrome.action to browser.action
-browser.action.onClicked.addListener((tab) => {
+// Use browser namespace for Firefox/Zen compatibility
+const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
+
+// Check if we're running in Zen Browser
+const isZenBrowser = typeof browserAPI.tabs.executeScript !== 'function';
+console.log('Running in Zen Browser:', isZenBrowser);
+
+// Add listener for extension icon click
+browserAPI.action.onClicked.addListener((tab) => {
   console.log('Extension icon clicked');
   sanitizeAndUpdateUrl(tab);
 });
@@ -39,141 +46,28 @@ function sanitizeAndUpdateUrl(tab) {
   const sanitizedUrl = url.toString();
   console.log('Sanitized URL:', sanitizedUrl);
   
-  // Update the current tab with the sanitized URL
-  // Firefox uses browser namespace and returns promises
-  browser.tabs.update(tab.id, { url: sanitizedUrl }).then(() => {
-    console.log('Tab updated with sanitized URL');
-    
-    // Create a listener for the tab update
-    const handleUpdated = (tabId, changeInfo, tabInfo) => {
-      if (tabId === tab.id && changeInfo.status === 'complete') {
-        // Remove the listener once we've handled the update
-        browser.tabs.onUpdated.removeListener(handleUpdated);
-        
-        console.log('Page loaded, copying to clipboard');
-        browser.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: copyToClipboard,
-          args: [sanitizedUrl]
-        }).then((results) => {
-          console.log('Clipboard operation completed, showing notification');
-          const copySucceeded = results[0].result;
-          browser.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: showNotification,
-            args: [
-              copySucceeded ? 'URL sanitized and copied to clipboard!' : 'URL sanitized, but copying to clipboard failed.',
-              !copySucceeded  // isError flag
-            ]
-          });
-        }).catch((error) => {
-          console.error('Error during clipboard operation:', error);
-          browser.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: showNotification,
-            args: ['URL sanitized, but an error occurred while trying to copy.', true]  // isError flag
-          });
-        });
-      }
-    };
-    
-    // Add the listener
-    browser.tabs.onUpdated.addListener(handleUpdated);
-  });
-}
-
-function copyToClipboard(text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    return navigator.clipboard.writeText(text).then(() => {
-      console.log('URL copied to clipboard using Clipboard API');
-      return true;
-    }).catch(err => {
-      console.error('Failed to copy using Clipboard API:', err);
-      return fallbackCopyToClipboard(text);
-    });
-  } else {
-    console.log('Clipboard API not available, using fallback method');
-    return fallbackCopyToClipboard(text);
-  }
-}
-
-function fallbackCopyToClipboard(text) {
-  const textArea = document.createElement("textarea");
-  textArea.value = text;
-  textArea.style.position = "fixed";  // Avoid scrolling to bottom
-  document.body.appendChild(textArea);
-  textArea.focus();
-  textArea.select();
-
+  // Copy to clipboard from background script
   try {
-    const successful = document.execCommand('copy');
-    const msg = successful ? 'successful' : 'unsuccessful';
-    console.log('Fallback: Copying text command was ' + msg);
+    const textArea = document.createElement('textarea');
+    textArea.value = sanitizedUrl;
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    const success = document.execCommand('copy');
+    console.log('Background clipboard copy attempt:', success ? 'succeeded' : 'failed');
+    
     document.body.removeChild(textArea);
-    return successful;
-  } catch (err) {
-    console.error('Fallback: Oops, unable to copy', err);
-    document.body.removeChild(textArea);
-    return false;
+  } catch (error) {
+    console.log('Background clipboard operation failed:', error);
   }
-}
-
-function showNotification(message, isError = false) {
-  console.log('Showing notification:', message);
   
-  // Create container for shadow DOM
-  const container = document.createElement('div');
-  container.style.cssText = `
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 2147483647;
-  `;
-  
-  // Create shadow DOM
-  const shadow = container.attachShadow({mode: 'closed'});
-  
-  // Create notification element
-  const notification = document.createElement('div');
-  notification.textContent = message;
-  
-  // Create style element
-  const style = document.createElement('style');
-  style.textContent = `
-    .notification {
-      background-color: ${isError ? '#FFC387' : '#327834'};
-      color: ${isError ? 'black' : 'white'};
-      padding: 16px;
-      border-radius: 4px;
-      font-family: Arial, sans-serif;
-      font-size: 16px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-      text-align: center;
-      min-width: 200px;
-      max-width: 80%;
-    }
-  `;
-  
-  // Add style and notification to shadow DOM
-  shadow.appendChild(style);
-  shadow.appendChild(notification);
-  
-  // Add class to notification
-  notification.className = 'notification';
-  
-  // Add container to body
-  document.body.appendChild(container);
-  console.log('Notification added to the page');
-
-  setTimeout(() => {
-    notification.style.opacity = '0';
-    notification.style.transition = 'opacity 0.5s';
-    setTimeout(() => {
-      document.body.removeChild(container);
-      console.log('Notification removed from the page');
-    }, 500);
-  }, 3000);
+  // Update the current tab with the sanitized URL
+  browserAPI.tabs.update(tab.id, { url: sanitizedUrl }).then(() => {
+    console.log('Tab updated with sanitized URL');
+  }).catch((error) => {
+    console.error('Error updating tab:', error);
+  });
 }
 
 console.log('Background script setup complete');
