@@ -1,6 +1,8 @@
-// Copyright (C) 2024 Seth Cottle
+// Copyright (C) 2024 Seth Cottle (Original Work)
+// Copyright (C) 2025 Ryan Cuppernull (Firefox Modifications)
 
-// This file is part of Sanitize It.
+// This file is part of Sanitize It (Firefox Edition).
+// This version uses Firefox's browser API and background script clipboard access.
 
 // Sanitize It is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,15 +15,12 @@
 
 console.log('Background script loaded');
 
-// Use browser namespace for Firefox/Zen compatibility
-const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
-
 // Check if we're running in Zen Browser
-const isZenBrowser = typeof browserAPI.tabs.executeScript !== 'function';
+const isZenBrowser = typeof browser.tabs.executeScript !== 'function';
 console.log('Running in Zen Browser:', isZenBrowser);
 
 // Add listener for extension icon click
-browserAPI.action.onClicked.addListener((tab) => {
+browser.action.onClicked.addListener((tab) => {
   console.log('Extension icon clicked');
   sanitizeAndUpdateUrl(tab);
 });
@@ -62,12 +61,83 @@ function sanitizeAndUpdateUrl(tab) {
     console.log('Background clipboard operation failed:', error);
   }
   
-  // Update the current tab with the sanitized URL
-  browserAPI.tabs.update(tab.id, { url: sanitizedUrl }).then(() => {
-    console.log('Tab updated with sanitized URL');
+  // Show toast notification on current page BEFORE navigating
+  browser.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: showToast
+  }).then(() => {
+    console.log('Toast notification injected successfully');
+    
+    // Wait for toast animation to complete (3 seconds display + fade out)
+    setTimeout(() => {
+      browser.tabs.update(tab.id, { url: sanitizedUrl }).then(() => {
+        console.log('Tab updated with sanitized URL');
+      }).catch((error) => {
+        console.error('Error updating tab:', error);
+      });
+    }, 2500); // 3s display + 300ms fade = 3.3s total
   }).catch((error) => {
-    console.error('Error updating tab:', error);
+    console.error('Error showing toast notification:', error);
+    // If toast fails, still navigate to sanitized URL
+    browser.tabs.update(tab.id, { url: sanitizedUrl });
   });
+}
+
+// Content script function to show toast notification
+function showToast() {
+  const toast = document.createElement('div');
+  toast.textContent = '✓ URL sanitized and copied! Reloading page...';
+  toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2147483647;
+    background: #4CAF50;
+    color: white;
+    padding: 16px 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    animation: slideIn 0.3s ease-out;
+  `;
+  
+  // Add animation keyframes
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    @keyframes slideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+  document.body.appendChild(toast);
+  
+  // Slide out and remove after 3 seconds
+  setTimeout(() => {
+    toast.style.animation = 'slideOut 0.3s ease-in';
+    setTimeout(() => {
+      toast.remove();
+      style.remove();
+    }, 300);
+  }, 1500);
 }
 
 console.log('Background script setup complete');

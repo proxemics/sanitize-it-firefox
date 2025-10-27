@@ -1,0 +1,58 @@
+NOTICE
+
+Sanitize It (Firefox Edition)
+==============================
+
+This Firefox edition is a derivative work based on the original "Sanitize It" 
+browser extension created by Seth Cottle.
+
+ORIGINAL WORK:
+--------------
+Project: Sanitize It
+Author: Seth Cottle
+Repository: https://github.com/sethcottle/sanitize-it
+Copyright: (C) 2024 Seth Cottle
+License: GNU General Public License v3.0 or later
+
+The original work supports Chrome, Edge, and Safari browsers.
+
+MODIFICATIONS FOR FIREFOX:
+---------------------------
+Modified by: Ryan Cuppernull
+Copyright: (C) 2025 Ryan Cuppernull
+License: GNU General Public License v3.0 or later (same as original)
+
+Key modifications made for Firefox compatibility:
+- Converted from Chrome API (`chrome.*`) to Firefox API (`browser.*`)
+- Implemented background script clipboard access using document.execCommand()
+- Replaced Chrome notification system with custom toast notifications
+- Updated manifest.json for Firefox manifest v3 requirements
+- Added browser_specific_settings for Gecko/Firefox compatibility
+- Modified script injection to use Firefox-compatible parameters
+
+ATTRIBUTION:
+------------
+Seth Cottle was inspired to create the original Sanitize It extension by 
+Ryan Cuppernull (https://github.com/proxemics).
+
+Ryan Cuppernull subsequently created this Firefox-compatible fork to bring 
+the functionality to Firefox users.
+
+LICENSE:
+--------
+Both the original work and this derivative work are licensed under the 
+GNU General Public License v3.0 or later. See the LICENSE file for full 
+license text.
+
+This program is distributed WITHOUT ANY WARRANTY; without even the implied 
+warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+GNU General Public License for more details.
+
+DISCLAIMER:
+-----------
+This Firefox edition is independently maintained and is not officially 
+endorsed by or affiliated with Seth Cottle or the original Sanitize It project.
+
+All trademarks, service marks, and company names are the property of their 
+respective owners.
+
